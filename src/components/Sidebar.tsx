@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, CreditCard, Play, RotateCcw, Download, Upload, Save, PlayCircle, StopCircle } from 'lucide-react';
+import { Eye, CreditCard, Play, RotateCcw, Download, Upload, Save, PlayCircle, StopCircle, Scan } from 'lucide-react';
 import { useWorkflowStore } from '../store/workflowStore';
 
 const nodeTemplates = [
@@ -8,7 +8,8 @@ const nodeTemplates = [
     label: 'Start',
     icon: PlayCircle,
     apiEndpoint: '',
-    defaultPayload: {}
+    defaultPayload: {},
+    color: 'green'
   },
   {
     type: 'liveness',
@@ -19,7 +20,8 @@ const nodeTemplates = [
       sessionId: '',
       quality: 'high',
       timeout: 30000
-    }
+    },
+    color: 'blue'
   },
   {
     type: 'cardCapture',
@@ -30,14 +32,29 @@ const nodeTemplates = [
       cardType: 'auto_detect',
       extractText: true,
       validateFields: true
-    }
+    },
+    color: 'purple'
+  },
+  {
+    type: 'scanner',
+    label: 'Scanner',
+    icon: Scan,
+    apiEndpoint: '/idmscan/scanner',
+    defaultPayload: {
+      scanType: 'auto',
+      extractData: true,
+      timeout: 20000
+    },
+    color: 'orange',
+    description: 'MRZ or Barcode scanning'
   },
   {
     type: 'end',
     label: 'End',
     icon: StopCircle,
     apiEndpoint: '',
-    defaultPayload: {}
+    defaultPayload: {},
+    color: 'red'
   }
 ];
 
@@ -103,20 +120,22 @@ export const Sidebar: React.FC = () => {
             const Icon = template.icon;
             const getNodeColor = () => {
               switch (template.type) {
-                case 'start': return 'border-green-300 hover:border-green-400 hover:bg-green-50';
-                case 'end': return 'border-red-300 hover:border-red-400 hover:bg-red-50';
-                case 'liveness': return 'border-blue-300 hover:border-blue-400 hover:bg-blue-50';
-                case 'cardCapture': return 'border-purple-300 hover:border-purple-400 hover:bg-purple-50';
-                default: return 'border-gray-300 hover:border-gray-400 hover:bg-gray-50';
+                case 'start': return 'border-green-300 hover:border-green-400 hover:bg-green-50 hover:shadow-md';
+                case 'end': return 'border-red-300 hover:border-red-400 hover:bg-red-50 hover:shadow-md';
+                case 'liveness': return 'border-blue-300 hover:border-blue-400 hover:bg-blue-50 hover:shadow-md';
+                case 'cardCapture': return 'border-purple-300 hover:border-purple-400 hover:bg-purple-50 hover:shadow-md';
+                case 'scanner': return 'border-orange-300 hover:border-orange-400 hover:bg-orange-50 hover:shadow-md';
+                default: return 'border-gray-300 hover:border-gray-400 hover:bg-gray-50 hover:shadow-md';
               }
             };
-            
+
             const getIconColor = () => {
               switch (template.type) {
                 case 'start': return 'bg-green-100 text-green-600';
                 case 'end': return 'bg-red-100 text-red-600';
                 case 'liveness': return 'bg-blue-100 text-blue-600';
                 case 'cardCapture': return 'bg-purple-100 text-purple-600';
+                case 'scanner': return 'bg-orange-100 text-orange-600';
                 default: return 'bg-gray-100 text-gray-600';
               }
             };
@@ -126,7 +145,7 @@ export const Sidebar: React.FC = () => {
                 key={template.type}
                 draggable
                 onDragStart={(e) => onDragStart(e, template)}
-                className={`flex items-center gap-3 p-4 bg-gray-50 rounded-lg border-2 border-dashed cursor-grab transition-colors ${getNodeColor()}`}
+                className={`flex items-center gap-3 p-4 bg-gray-50 rounded-xl border-2 border-dashed cursor-grab transition-all duration-200 ${getNodeColor()}`}
               >
                 <div className={`p-2 rounded-lg ${getIconColor()}`}>
                   <Icon className="w-5 h-5" />

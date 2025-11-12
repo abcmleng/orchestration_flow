@@ -99,8 +99,19 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
   },
 
   onConnect: (connection) => {
+    const { nodes, edges } = get();
+    const targetNode = nodes.find(n => n.id === connection.target);
+    const sourceNode = nodes.find(n => n.id === connection.source);
+
+    if (targetNode?.data.type === 'scanner') {
+      if (sourceNode?.data.type !== 'cardCapture') {
+        alert('Scanner node can only connect after Card Capture node!');
+        return;
+      }
+    }
+
     set({
-      edges: addEdge({ ...connection, type: 'smoothstep' }, get().edges)
+      edges: addEdge({ ...connection, type: 'smoothstep' }, edges)
     });
   },
 
@@ -241,15 +252,67 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
 
   exportWorkflow: () => {
     const { nodes, edges } = get();
-    return JSON.stringify({ nodes, edges }, null, 2);
+    const workflowData = {
+      workflowName: `IDMScan_Workflow_${Date.now()}`,
+      version: '1.0',
+      created: new Date().toISOString(),
+      nodes: nodes.map(node => ({
+        id: node.id,
+        type: node.data.type,
+        label: node.data.label,
+        apiEndpoint: node.data.apiEndpoint || null,
+        position: node.position,
+        inputs: node.data.requestPayload || {},
+        outputs: node.data.outputSchema || {},
+        connections: edges.filter(e => e.source === node.id).map(e => e.target)
+      }))
+    };
+    return JSON.stringify(workflowData, null, 2);
   },
 
   importWorkflow: (json) => {
     try {
-      const { nodes, edges } = JSON.parse(json);
-      set({ nodes, edges });
+      const data = JSON.parse(json);
+
+      if (data.workflowName && data.nodes) {
+        const importedNodes = data.nodes.map((node: any) => ({
+          id: node.id,
+          type: 'customNode',
+          position: node.position || { x: 0, y: 0 },
+          data: {
+            id: node.id,
+            type: node.type,
+            label: node.label,
+            apiEndpoint: node.apiEndpoint || '',
+            requestPayload: node.inputs || {},
+            outputSchema: node.outputs || {},
+            status: 'idle'
+          }
+        }));
+
+        const importedEdges: Edge[] = [];
+        data.nodes.forEach((node: any) => {
+          if (node.connections && Array.isArray(node.connections)) {
+            node.connections.forEach((targetId: string) => {
+              importedEdges.push({
+                id: `${node.id}-${targetId}`,
+                source: node.id,
+                target: targetId,
+                type: 'smoothstep'
+              });
+            });
+          }
+        });
+
+        set({ nodes: importedNodes, edges: importedEdges });
+        console.log('Workflow imported successfully');
+      } else {
+        const { nodes, edges } = data;
+        set({ nodes, edges });
+      }
     } catch (error) {
       console.error('Failed to import workflow:', error);
+      alert('Failed to import workflow. Please check the JSON format.');
     }
   }
 }));

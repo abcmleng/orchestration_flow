@@ -58,10 +58,15 @@ const WorkflowCanvas: React.FC = () => {
       if (!templateData) return;
 
       const template = JSON.parse(templateData);
-      const position = project({
+      const rawPosition = project({
         x: event.clientX - reactFlowBounds.left,
         y: event.clientY - reactFlowBounds.top,
       });
+
+      const position = {
+        x: Math.round(rawPosition.x / 20) * 20,
+        y: Math.round(rawPosition.y / 20) * 20,
+      };
 
       const newNode: Node<NodeData> = {
         id: `${template.type}-${Date.now()}`,
@@ -111,12 +116,17 @@ const WorkflowCanvas: React.FC = () => {
           connectionMode={ConnectionMode.Strict}
           defaultEdgeOptions={{
             type: 'smoothstep',
-            style: { strokeWidth: 2, stroke: '#3B82F6' }
+            style: { strokeWidth: 2, stroke: '#3B82F6' },
+            animated: true
           }}
+          snapToGrid={true}
+          snapGrid={[20, 20]}
           fitView
           className="bg-gray-50"
+          minZoom={0.2}
+          maxZoom={2}
         >
-          <Background color="#E5E7EB" gap={20} size={1} />
+          <Background color="#E5E7EB" gap={20} size={1} variant="dots" />
           <Controls className="bg-white border border-gray-200 rounded-lg shadow-sm" />
           <MiniMap
             nodeColor={(node) => {

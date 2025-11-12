@@ -7,8 +7,10 @@ export const ConfigPanel: React.FC = () => {
   const [config, setConfig] = useState({
     label: '',
     apiEndpoint: '',
-    requestPayload: '{}'
+    requestPayload: '{}',
+    outputSchema: '{}'
   });
+  const [jsonError, setJsonError] = useState<string | null>(null);
   const [showJson, setShowJson] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -19,9 +21,11 @@ export const ConfigPanel: React.FC = () => {
       setConfig({
         label: selectedNodeData.data.label,
         apiEndpoint: selectedNodeData.data.apiEndpoint,
-        requestPayload: JSON.stringify(selectedNodeData.data.requestPayload || {}, null, 2)
+        requestPayload: JSON.stringify(selectedNodeData.data.requestPayload || {}, null, 2),
+        outputSchema: JSON.stringify(selectedNodeData.data.outputSchema || {}, null, 2)
       });
     }
+    setJsonError(null);
   }, [selectedNodeData]);
 
   const handleSave = () => {
@@ -29,38 +33,50 @@ export const ConfigPanel: React.FC = () => {
 
     try {
       const requestPayload = JSON.parse(config.requestPayload);
+      const outputSchema = JSON.parse(config.outputSchema);
       updateNodeData(selectedNode, {
         label: config.label,
         apiEndpoint: config.apiEndpoint,
-        requestPayload
+        requestPayload,
+        outputSchema
       });
+      setJsonError(null);
       alert('Configuration saved successfully!');
     } catch (error) {
-      alert('Invalid JSON in request payload');
+      const errorMsg = error instanceof Error ? error.message : 'Invalid JSON format';
+      setJsonError(errorMsg);
+      alert('Invalid JSON: ' + errorMsg);
+    }
+  };
+
+  const validateJson = (value: string, field: 'requestPayload' | 'outputSchema') => {
+    try {
+      JSON.parse(value);
+      setJsonError(null);
+    } catch (error) {
+      setJsonError(`Invalid JSON in ${field === 'requestPayload' ? 'Request Payload' : 'Output Schema'}`);
     }
   };
 
   const getWorkflowJson = () => {
     const workflowData = {
-      workflow: {
-        id: `workflow_${Date.now()}`,
-        name: "IDMScan Workflow",
-        created: new Date().toISOString(),
-        nodes: nodes.map(node => ({
-          id: node.id,
-          type: node.data.type,
-          label: node.data.label,
-          apiEndpoint: node.data.apiEndpoint,
-          requestPayload: node.data.requestPayload,
-          position: node.position
-        })),
-        edges: edges.map(edge => ({
-          id: edge.id,
-          source: edge.source,
-          target: edge.target
-        })),
-        executionOrder: getExecutionOrder()
-      }
+      workflowName: `KYC_Flow_${Date.now()}`,
+      version: '1.0',
+      created: new Date().toISOString(),
+      nodes: nodes.map(node => ({
+        id: node.id,
+        type: node.data.type === 'start' ? 'Start' :
+              node.data.type === 'end' ? 'End' :
+              node.data.type === 'liveness' ? 'Liveness Check' :
+              node.data.type === 'cardCapture' ? 'Card Capture' :
+              node.data.type === 'scanner' ? 'Scanner' : node.data.type,
+        apiEndpoint: node.data.apiEndpoint || null,
+        position: node.position,
+        inputs: node.data.requestPayload || {},
+        outputs: node.data.outputSchema || {},
+        connections: edges.filter(e => e.source === node.id).map(e => e.target)
+      })),
+      executionOrder: getExecutionOrder()
     };
     return JSON.stringify(workflowData, null, 2);
   };
@@ -252,11 +268,39 @@ export const ConfigPanel: React.FC = () => {
               </label>
               <textarea
                 value={config.requestPayload}
-                onChange={(e) => setConfig({ ...config, requestPayload: e.target.value })}
-                rows={12}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+                onChange={(e) => {
+                  setConfig({ ...config, requestPayload: e.target.value });
+                  validateJson(e.target.value, 'requestPayload');
+                }}
+                rows={8}
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm ${
+                  jsonError && jsonError.includes('Request Payload') ? 'border-red-500' : 'border-gray-300'
+                }`}
               />
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Output Schema (JSON)
+              </label>
+              <textarea
+                value={config.outputSchema}
+                onChange={(e) => {
+                  setConfig({ ...config, outputSchema: e.target.value });
+                  validateJson(e.target.value, 'outputSchema');
+                }}
+                rows={8}
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm ${
+                  jsonError && jsonError.includes('Output Schema') ? 'border-red-500' : 'border-gray-300'
+                }`}
+              />
+            </div>
+
+            {jsonError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-600">{jsonError}</p>
+              </div>
+            )}
           </>
         )}
 

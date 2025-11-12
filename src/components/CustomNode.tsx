@@ -1,6 +1,6 @@
 import React from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
-import { Play, CheckCircle, XCircle, Loader2, Eye, CreditCard, PlayCircle, StopCircle, Clock } from 'lucide-react';
+import { Play, CheckCircle, XCircle, Loader2, Eye, CreditCard, PlayCircle, StopCircle, Clock, Scan } from 'lucide-react';
 import { NodeData } from '../types/workflow';
 
 const statusColors = {
@@ -21,14 +21,16 @@ const nodeTypeIcons = {
   start: PlayCircle,
   end: StopCircle,
   liveness: Eye,
-  cardCapture: CreditCard
+  cardCapture: CreditCard,
+  scanner: Scan
 };
 
 const nodeTypeColors = {
   start: 'bg-green-100 text-green-600',
   end: 'bg-red-100 text-red-600',
   liveness: 'bg-blue-100 text-blue-600',
-  cardCapture: 'bg-purple-100 text-purple-600'
+  cardCapture: 'bg-purple-100 text-purple-600',
+  scanner: 'bg-orange-100 text-orange-600'
 };
 
 export const CustomNode: React.FC<NodeProps<NodeData>> = ({ data, selected }) => {
@@ -37,10 +39,10 @@ export const CustomNode: React.FC<NodeProps<NodeData>> = ({ data, selected }) =>
   
   return (
     <div className={`
-      relative min-w-[320px] rounded-lg border-2 transition-all duration-300 shadow-lg
+      relative min-w-[320px] rounded-xl border-2 transition-all duration-300 shadow-lg
       ${statusColors[data.status]}
-      ${selected ? 'ring-2 ring-blue-500 ring-offset-2' : ''}
-      backdrop-blur-sm
+      ${selected ? 'ring-2 ring-blue-500 ring-offset-2 scale-105' : ''}
+      backdrop-blur-sm hover:shadow-xl
     `}>
       {data.type !== 'start' && (
         <Handle

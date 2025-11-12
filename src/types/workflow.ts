@@ -1,6 +1,6 @@
 export interface NodeData {
   id: string;
-  type: 'start' | 'end' | 'liveness' | 'cardCapture';
+  type: 'start' | 'end' | 'liveness' | 'cardCapture' | 'scanner';
   label: string;
   apiEndpoint: string;
   requestPayload: any;
@@ -9,6 +9,7 @@ export interface NodeData {
   error?: string;
   executionTime?: number;
   timestamp?: string;
+  outputSchema?: any;
 }
 
 export interface WorkflowEdge {

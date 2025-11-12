@@ -63,6 +63,24 @@ export class APIService {
           confidence: 0.92,
           sessionId: 'card_' + Math.random().toString(36).substr(2, 9)
         }
+      },
+      '/idmscan/scanner': {
+        success: true,
+        data: {
+          scanType: 'MRZ',
+          extractedData: {
+            documentType: 'P',
+            documentNumber: 'L898902C3',
+            nationality: 'UTO',
+            dateOfBirth: '1974-08-12',
+            sex: 'F',
+            expirationDate: '2024-04-15',
+            personalNumber: 'ZE184226B'
+          },
+          barcodeData: null,
+          confidence: 0.97,
+          sessionId: 'scan_' + Math.random().toString(36).substr(2, 9)
+        }
       }
     };
 
