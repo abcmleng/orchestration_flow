@@ -57,7 +57,7 @@ export class APIService {
           longitude: payload.longitude
         }
       },
-      '/jdmscan/card-capture': {
+      '/ml/document': {
         success: true,
         data: {
           cardType: 'driver_license',
