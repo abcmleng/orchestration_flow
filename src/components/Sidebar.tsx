@@ -31,7 +31,7 @@ const nodeTemplates = [
     type: 'cardCapture',
     label: 'Card Capture',
     icon: CreditCard,
-    apiEndpoint: '/ml/document',
+    apiEndpoint: '/jdmscan/card-capture',
     defaultInputs: {
       ...defaultMultipartInput,
       metadataIndex: 2702,

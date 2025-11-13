@@ -44,7 +44,7 @@ export class APIService {
     await new Promise(resolve => setTimeout(resolve, 1500 + Math.random() * 1000));
     
     const responses = {
-      '/ml/liveness': {
+      '/jdmscan/liveness': {
         success: true,
         data: {
           livenessScore: 0.95,
@@ -57,7 +57,7 @@ export class APIService {
           longitude: payload.longitude
         }
       },
-      '/ml/document': {
+      '/jdmscan/card-capture': {
         success: true,
         data: {
           cardType: 'driver_license',
