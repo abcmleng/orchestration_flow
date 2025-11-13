@@ -28,8 +28,11 @@ export class APIService {
     // Response interceptor
     this.client.interceptors.response.use(
       (response) => {
-        const processingTime = Date.now() - response.config.metadata.startTime;
-        response.data.processingTime = processingTime;
+        const metadata = (response.config as any).metadata;
+        if (metadata) {
+          const processingTime = Date.now() - metadata.startTime;
+          response.data.processingTime = processingTime;
+        }
         return response;
       },
       (error) => Promise.reject(error)
@@ -41,17 +44,20 @@ export class APIService {
     await new Promise(resolve => setTimeout(resolve, 1500 + Math.random() * 1000));
     
     const responses = {
-      '/idmscan/liveness': {
+      '/jdmscan/liveness': {
         success: true,
         data: {
           livenessScore: 0.95,
           faceDetected: true,
           quality: 'high',
           landmarks: 68,
-          sessionId: 'live_' + Math.random().toString(36).substr(2, 9)
+          sessionId: 'live_' + Math.random().toString(36).substr(2, 9),
+          token: payload.token,
+          latitude: payload.latitude,
+          longitude: payload.longitude
         }
       },
-      '/idmscan/card-capture': {
+      '/jdmscan/card-capture': {
         success: true,
         data: {
           cardType: 'driver_license',
@@ -61,10 +67,14 @@ export class APIService {
             idNumber: 'DL123456789'
           },
           confidence: 0.92,
-          sessionId: 'card_' + Math.random().toString(36).substr(2, 9)
+          sessionId: 'card_' + Math.random().toString(36).substr(2, 9),
+          token: payload.token,
+          latitude: payload.latitude,
+          longitude: payload.longitude,
+          metadataIndex: payload.metadataIndex
         }
       },
-      '/idmscan/scanner': {
+      '/jdmscan/scanner': {
         success: true,
         data: {
           scanType: 'MRZ',
@@ -79,21 +89,25 @@ export class APIService {
           },
           barcodeData: null,
           confidence: 0.97,
-          sessionId: 'scan_' + Math.random().toString(36).substr(2, 9)
+          sessionId: 'scan_' + Math.random().toString(36).substr(2, 9),
+          token: payload.token,
+          latitude: payload.latitude,
+          longitude: payload.longitude
         }
       }
     };
 
     const response = responses[endpoint as keyof typeof responses];
     if (!response) {
-      throw new Error(`Unknown endpoint: ${endpoint}`);
+      throw new Error(`Endpoint not found: ${endpoint}`);
     }
 
     return {
       ...response,
       timestamp: new Date().toISOString(),
       processingTime: Math.round(1500 + Math.random() * 1000),
-      nodeId
+      nodeId,
+      endpoint
     };
   }
 

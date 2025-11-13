@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { addEdge, applyNodeChanges, applyEdgeChanges, Node, Edge } from 'reactflow';
-import { NodeData, WorkflowState, APIResponse } from '../types/workflow';
+import { NodeData, WorkflowState } from '../types/workflow';
 import { apiService } from '../services/apiService';
 
 interface WorkflowStore extends WorkflowState {
@@ -10,7 +10,7 @@ interface WorkflowStore extends WorkflowState {
   onEdgesChange: (changes: any) => void;
   onConnect: (connection: any) => void;
   setSelectedNode: (nodeId: string | null) => void;
-  updateNodeData: (nodeId: string, data: Partial<NodeData>) => void;
+  updateNodeData: (nodeId: string, data: Partial<Omit<NodeData, 'id' | 'type'>>) => void;
   executeWorkflow: () => Promise<void>;
   resetWorkflow: () => void;
   saveWorkflow: () => void;
@@ -20,23 +20,19 @@ interface WorkflowStore extends WorkflowState {
 }
 
 const getExecutionOrder = (nodes: Node[], edges: Edge[]): string[] => {
-  // Simple topological sort for workflow execution order
   const adjacencyList: { [key: string]: string[] } = {};
   const inDegree: { [key: string]: number } = {};
 
-  // Initialize
   nodes.forEach(node => {
     adjacencyList[node.id] = [];
     inDegree[node.id] = 0;
   });
 
-  // Build adjacency list and calculate in-degrees
   edges.forEach(edge => {
     adjacencyList[edge.source].push(edge.target);
     inDegree[edge.target]++;
   });
 
-  // Topological sort using Kahn's algorithm
   const queue = nodes.filter(node => inDegree[node.id] === 0).map(node => node.id);
   const result: string[] = [];
 
@@ -57,22 +53,39 @@ const getExecutionOrder = (nodes: Node[], edges: Edge[]): string[] => {
 
 const validateWorkflow = (nodes: Node[], edges: Edge[]): { isValid: boolean; errors: string[] } => {
   const errors: string[] = [];
-  
+
   const startNodes = nodes.filter(n => n.data.type === 'start');
   const endNodes = nodes.filter(n => n.data.type === 'end');
-  
+  const scannerNodes = nodes.filter(n => n.data.type === 'scanner');
+
   if (startNodes.length === 0) {
-    errors.push('Workflow must have at least one start node');
+    errors.push('Workflow must have exactly one start node');
   }
-  
+
   if (startNodes.length > 1) {
     errors.push('Workflow can only have one start node');
   }
-  
+
   if (endNodes.length === 0) {
-    errors.push('Workflow must have at least one end node');
+    errors.push('Workflow must have exactly one end node');
   }
-  
+
+  if (endNodes.length > 1) {
+    errors.push('Workflow can only have one end node');
+  }
+
+  for (const scanner of scannerNodes) {
+    const incomingEdges = edges.filter(e => e.target === scanner.id);
+    if (incomingEdges.length !== 1) {
+      errors.push(`Scanner node must have exactly one incoming connection`);
+    } else {
+      const sourceNode = nodes.find(n => n.id === incomingEdges[0].source);
+      if (sourceNode?.data.type !== 'cardCapture') {
+        errors.push(`Scanner node must connect directly from Card Capture node`);
+      }
+    }
+  }
+
   return { isValid: errors.length === 0, errors };
 };
 
@@ -105,7 +118,23 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
 
     if (targetNode?.data.type === 'scanner') {
       if (sourceNode?.data.type !== 'cardCapture') {
-        alert('Scanner node can only connect after Card Capture node!');
+        alert('Scanner node must connect immediately after Card Capture node only!');
+        return;
+      }
+      const existingCardCaptureConnections = edges.filter(e => e.target === connection.target);
+      if (existingCardCaptureConnections.length > 0) {
+        alert('Scanner already has an incoming connection');
+        return;
+      }
+    }
+
+    if (sourceNode?.data.type === 'cardCapture') {
+      const existingScannerConnection = edges.find(
+        e => e.source === connection.source &&
+        nodes.find(n => n.id === e.target)?.data.type === 'scanner'
+      );
+      if (existingScannerConnection && connection.target !== existingScannerConnection.target) {
+        alert('Card Capture can only connect to one Scanner node');
         return;
       }
     }
@@ -115,13 +144,23 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
     });
   },
 
-  setSelectedNode: (nodeId) => set({ selectedNode: nodeId }),
+  setSelectedNode: (nodeId) => {
+    set({ selectedNode: nodeId });
+  },
 
   updateNodeData: (nodeId, data) => {
     set({
       nodes: get().nodes.map(node =>
         node.id === nodeId
-          ? { ...node, data: { ...node.data, ...data } }
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                ...data,
+                id: node.data.id,
+                type: node.data.type
+              }
+            }
           : node
       )
     });
@@ -130,14 +169,30 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
   executeWorkflow: async () => {
     const { nodes, edges } = get();
     const validation = validateWorkflow(nodes, edges);
-    
+
     if (!validation.isValid) {
+      alert('Workflow validation failed: ' + validation.errors.join(', '));
       console.error('Workflow validation failed:', validation.errors);
       return;
     }
-    
+
+    for (const node of nodes) {
+      if (node.data.type === 'scanner') {
+        const incomingEdges = edges.filter(e => e.target === node.id);
+        if (incomingEdges.length !== 1) {
+          alert('Scanner node must have exactly one incoming connection from Card Capture');
+          return;
+        }
+        const sourceNode = nodes.find(n => n.id === incomingEdges[0].source);
+        if (sourceNode?.data.type !== 'cardCapture') {
+          alert('Scanner node must connect directly from Card Capture node');
+          return;
+        }
+      }
+    }
+
     const executionOrder = getExecutionOrder(nodes, edges);
-    
+
     set({ isExecuting: true, executionOrder });
 
     let previousResult: any = null;
@@ -146,17 +201,16 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
       const node = nodes.find(n => n.id === nodeId);
       if (!node) continue;
 
-      // Skip start and end nodes for API execution
       if (node.data.type === 'start') {
-        get().updateNodeData(nodeId, { 
+        get().updateNodeData(nodeId, {
           status: 'success',
           timestamp: new Date().toISOString()
         });
         continue;
       }
-      
+
       if (node.data.type === 'end') {
-        get().updateNodeData(nodeId, { 
+        get().updateNodeData(nodeId, {
           status: 'success',
           timestamp: new Date().toISOString(),
           response: { message: 'Workflow completed successfully', previousResult }
@@ -164,30 +218,22 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
         continue;
       }
 
-      // Update node status to running
-      get().updateNodeData(nodeId, { 
+      get().updateNodeData(nodeId, {
         status: 'running',
-        response: null,
+        response: undefined,
         error: undefined,
         timestamp: new Date().toISOString()
       });
 
       try {
-        // Prepare request payload (include previous result if available)
-        const requestPayload = {
-          ...node.data.requestPayload,
-          ...(previousResult && { previousStepResult: previousResult })
-        };
-
         const startTime = Date.now();
-        const response = await apiService.executeNode(node.data.apiEndpoint, requestPayload, nodeId);
+        const response = await apiService.executeNode(node.data.apiEndpoint || '', node.data.inputs || {}, nodeId);
         const executionTime = Date.now() - startTime;
-        
-        // Update node with success
+
         get().updateNodeData(nodeId, {
           status: 'success',
           response: response,
-          requestPayload,
+          inputs: node.data.inputs || {},
           executionTime,
           timestamp: new Date().toISOString()
         });
@@ -195,13 +241,12 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
         previousResult = response.data;
 
       } catch (error) {
-        // Update node with error
         get().updateNodeData(nodeId, {
           status: 'failed',
           error: error instanceof Error ? error.message : 'Unknown error',
           timestamp: new Date().toISOString()
         });
-        break; // Stop execution on error
+        break;
       }
     }
 
@@ -214,8 +259,8 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
         ...node,
         data: {
           ...node.data,
-          status: 'idle',
-          response: null,
+          status: 'idle' as const,
+          response: undefined,
           error: undefined,
           executionTime: undefined,
           timestamp: undefined
@@ -228,11 +273,25 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
   saveWorkflow: () => {
     const { nodes, edges } = get();
     const workflowData = {
-      nodes,
+      nodes: nodes.map(n => ({
+        id: n.id,
+        type: 'customNode',
+        position: n.position,
+        data: {
+          id: n.data.id,
+          type: n.data.type,
+          label: n.data.label,
+          apiEndpoint: n.data.apiEndpoint,
+          inputs: n.data.inputs || {},
+          outputs: n.data.outputs || {},
+          status: 'idle'
+        }
+      })),
       edges,
       savedAt: new Date().toISOString()
     };
     localStorage.setItem('idmscan-workflow', JSON.stringify(workflowData));
+    alert('Workflow saved successfully!');
     console.log('Workflow saved to localStorage');
   },
 
@@ -242,8 +301,10 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
       try {
         const workflowData = JSON.parse(saved);
         const { nodes, edges } = workflowData;
-        set({ nodes, edges });
-        console.log('Workflow loaded from localStorage');
+        if (nodes && edges) {
+          set({ nodes, edges });
+          console.log('Workflow loaded from localStorage');
+        }
       } catch (error) {
         console.error('Failed to load workflow:', error);
       }
@@ -253,17 +314,18 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
   exportWorkflow: () => {
     const { nodes, edges } = get();
     const workflowData = {
-      workflowName: `IDMScan_Workflow_${Date.now()}`,
-      version: '1.0',
-      created: new Date().toISOString(),
+      workflowName: `KYC_Flow_${Date.now()}`,
       nodes: nodes.map(node => ({
         id: node.id,
-        type: node.data.type,
-        label: node.data.label,
-        apiEndpoint: node.data.apiEndpoint || null,
+        type: node.data.type === 'start' ? 'Start' :
+              node.data.type === 'end' ? 'End' :
+              node.data.type === 'liveness' ? 'Liveness Check' :
+              node.data.type === 'cardCapture' ? 'Card Capture' :
+              node.data.type === 'scanner' ? 'Scanner' : node.data.type,
+        apiEndpoint: node.data.apiEndpoint,
         position: node.position,
-        inputs: node.data.requestPayload || {},
-        outputs: node.data.outputSchema || {},
+        inputs: node.data.inputs || {},
+        outputs: node.data.outputs || {},
         connections: edges.filter(e => e.source === node.id).map(e => e.target)
       }))
     };
@@ -274,21 +336,32 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
     try {
       const data = JSON.parse(json);
 
-      if (data.workflowName && data.nodes) {
-        const importedNodes = data.nodes.map((node: any) => ({
-          id: node.id,
-          type: 'customNode',
-          position: node.position || { x: 0, y: 0 },
-          data: {
+      if (data.workflowName && data.nodes && Array.isArray(data.nodes)) {
+        const typeMapping: { [key: string]: string } = {
+          'Start': 'start',
+          'End': 'end',
+          'Liveness Check': 'liveness',
+          'Card Capture': 'cardCapture',
+          'Scanner': 'scanner'
+        };
+
+        const importedNodes = data.nodes.map((node: any) => {
+          const nodeType = typeMapping[node.type] || node.type;
+          return {
             id: node.id,
-            type: node.type,
-            label: node.label,
-            apiEndpoint: node.apiEndpoint || '',
-            requestPayload: node.inputs || {},
-            outputSchema: node.outputs || {},
-            status: 'idle'
-          }
-        }));
+            type: 'customNode',
+            position: node.position || { x: 0, y: 0 },
+            data: {
+              id: node.id,
+              type: nodeType,
+              label: node.type,
+              apiEndpoint: node.apiEndpoint || null,
+              inputs: node.inputs || {},
+              outputs: node.outputs || {},
+              status: 'idle' as const
+            }
+          };
+        });
 
         const importedEdges: Edge[] = [];
         data.nodes.forEach((node: any) => {
@@ -305,10 +378,12 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
         });
 
         set({ nodes: importedNodes, edges: importedEdges });
+        alert('Workflow imported successfully!');
         console.log('Workflow imported successfully');
+      } else if (data.nodes && data.edges) {
+        set({ nodes: data.nodes, edges: data.edges });
       } else {
-        const { nodes, edges } = data;
-        set({ nodes, edges });
+        throw new Error('Invalid workflow format');
       }
     } catch (error) {
       console.error('Failed to import workflow:', error);

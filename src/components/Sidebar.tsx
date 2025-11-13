@@ -2,36 +2,40 @@ import React from 'react';
 import { Eye, CreditCard, Play, RotateCcw, Download, Upload, Save, PlayCircle, StopCircle, Scan } from 'lucide-react';
 import { useWorkflowStore } from '../store/workflowStore';
 
+const defaultMultipartInput = {
+  token: 'Sandip-Test',
+  latitude: 0.0,
+  longitude: 0.0,
+  user_agent: 'Mozilla/5.0',
+  file: '/path/to/file.jpg'
+};
+
 const nodeTemplates = [
   {
     type: 'start',
     label: 'Start',
     icon: PlayCircle,
-    apiEndpoint: '',
-    defaultPayload: {},
+    apiEndpoint: null,
+    defaultInputs: {},
     color: 'green'
   },
   {
     type: 'liveness',
     label: 'Liveness Check',
     icon: Eye,
-    apiEndpoint: '/idmscan/liveness',
-    defaultPayload: {
-      sessionId: '',
-      quality: 'high',
-      timeout: 30000
-    },
+    apiEndpoint: '/jdmscan/liveness',
+    defaultInputs: defaultMultipartInput,
     color: 'blue'
   },
   {
     type: 'cardCapture',
     label: 'Card Capture',
     icon: CreditCard,
-    apiEndpoint: '/idmscan/card-capture',
-    defaultPayload: {
-      cardType: 'auto_detect',
-      extractText: true,
-      validateFields: true
+    apiEndpoint: '/jdmscan/card-capture',
+    defaultInputs: {
+      ...defaultMultipartInput,
+      metadataIndex: 2702,
+      user_agent: undefined
     },
     color: 'purple'
   },
@@ -39,12 +43,8 @@ const nodeTemplates = [
     type: 'scanner',
     label: 'Scanner',
     icon: Scan,
-    apiEndpoint: '/idmscan/scanner',
-    defaultPayload: {
-      scanType: 'auto',
-      extractData: true,
-      timeout: 20000
-    },
+    apiEndpoint: '/jdmscan/scanner',
+    defaultInputs: defaultMultipartInput,
     color: 'orange',
     description: 'MRZ or Barcode scanning'
   },
@@ -52,8 +52,8 @@ const nodeTemplates = [
     type: 'end',
     label: 'End',
     icon: StopCircle,
-    apiEndpoint: '',
-    defaultPayload: {},
+    apiEndpoint: null,
+    defaultInputs: {},
     color: 'red'
   }
 ];
@@ -144,7 +144,7 @@ export const Sidebar: React.FC = () => {
               <div
                 key={template.type}
                 draggable
-                onDragStart={(e) => onDragStart(e, template)}
+                onDragStart={(e) => onDragStart(e, template as typeof nodeTemplates[0])}
                 className={`flex items-center gap-3 p-4 bg-gray-50 rounded-xl border-2 border-dashed cursor-grab transition-all duration-200 ${getNodeColor()}`}
               >
                 <div className={`p-2 rounded-lg ${getIconColor()}`}>
