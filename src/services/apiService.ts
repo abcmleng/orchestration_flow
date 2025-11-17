@@ -74,7 +74,7 @@ export class APIService {
           metadataIndex: payload.metadataIndex
         }
       },
-      '/jdmscan/scanner': {
+      '/ml/scanner': {
         success: true,
         data: {
           scanType: 'MRZ',
