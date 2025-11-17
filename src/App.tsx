@@ -148,13 +148,6 @@ const WorkflowCanvas: React.FC = () => {
 };
 
 const App: React.FC = () => {
-  const { loadWorkflow } = useWorkflowStore();
-
-  useEffect(() => {
-    // Load saved workflow on app start
-    loadWorkflow();
-  }, [loadWorkflow]);
-
   return (
     <div className="h-screen flex bg-gray-100">
       <ReactFlowProvider>
