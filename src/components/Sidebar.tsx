@@ -23,7 +23,7 @@ const nodeTemplates = [
     type: 'liveness',
     label: 'Liveness Check',
     icon: Eye,
-    apiEndpoint: '/jdmscan/liveness',
+    apiEndpoint: '/ml/liveness',
     defaultInputs: defaultMultipartInput,
     color: 'blue'
   },
@@ -43,7 +43,7 @@ const nodeTemplates = [
     type: 'scanner',
     label: 'Scanner',
     icon: Scan,
-    apiEndpoint: '/jdmscan/scanner',
+    apiEndpoint: '/ml/scanner',
     defaultInputs: defaultMultipartInput,
     color: 'orange',
     description: 'MRZ or Barcode scanning'
